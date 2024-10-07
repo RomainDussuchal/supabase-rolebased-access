@@ -1,0 +1,33 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tweets {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  title     String   
+  userId    String
+  user      users    @relation(fields: [userId], references: [id])
+}
+
+model users {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  name      String   
+  email     String   
+  password  String   
+  tweets    Tweets[]
+  user_role Role     @default(user)
+
+}
+
+
+enum Role {
+  admin
+  user
+}
