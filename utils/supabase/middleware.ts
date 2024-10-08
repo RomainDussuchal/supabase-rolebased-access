@@ -39,47 +39,45 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    return supabaseResponse;
-  }
-
   const isPublicRoute =
-    request.nextUrl.pathname === "/" || // Allow exactly the root path
+    request.nextUrl.pathname === "/" ||
     request.nextUrl.pathname.startsWith("/login") ||
     request.nextUrl.pathname.startsWith("/auth");
 
   const adminOnlyRoutes = ["/admin", "/private"];
 
+  // Redirect unauthenticated users to login page if accessing protected routes
   if (!user && !isPublicRoute) {
-    // no user, potentially respond by redirecting the user to the login page
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
-  if (user) {
-    // Check if the user is trying to access an admin-only route
-    if (
-      adminOnlyRoutes.some((route) =>
-        request.nextUrl.pathname.startsWith(route)
-      )
-    ) {
-      const { data: session } = await supabase.auth.getSession();
-      const token = session.session?.access_token;
 
-      if (token) {
-        try {
-          const jwt = jwtDecode(token);
-          const userRole = (jwt as { user_role?: string }).user_role;
+  // If user exists and is accessing an admin-only route, check their role
+  if (
+    user &&
+    adminOnlyRoutes.some((route) => request.nextUrl.pathname.startsWith(route))
+  ) {
+    const { data: session } = await supabase.auth.getSession();
+    const token = session.session?.access_token;
 
-          // If the user is not an admin, redirect them to the home page
-          if (userRole !== "admin") {
-            const url = request.nextUrl.clone();
-            url.pathname = "/";
-            return NextResponse.redirect(url);
-          }
-        } catch (error) {
-          console.error("Error decoding JWT:", error);
+    if (token) {
+      try {
+        const jwt = jwtDecode<{ user_role?: string }>(token);
+        const userRole = jwt.user_role;
+
+        // If the user does not have admin role, redirect them to home
+        if (userRole !== "admin") {
+          const url = request.nextUrl.clone();
+          url.pathname = "/";
+          return NextResponse.redirect(url);
         }
+      } catch (error) {
+        console.error("Error decoding JWT:", error);
+        // Optionally, you can redirect the user to an error page or log them out
+        const url = request.nextUrl.clone();
+        url.pathname = "/error";
+        return NextResponse.redirect(url);
       }
     }
   }
